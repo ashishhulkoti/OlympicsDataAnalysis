@@ -1,0 +1,579 @@
+
+Step1: Load all the required Libraries
+
+```{r}
+#Load all the required Libraries
+options(repos = "https://cloud.r-project.org/")
+
+
+install.packages("forecast")
+
+library("gganimate")
+library("data.table")
+library("knitr")
+library("gridExtra")
+library("tidyverse")
+library("plotly")
+library("readr")
+```
+
+Step2: Load the Dataset
+2.1: Load Athlete Events Dataset
+```{r}
+# LOAD ATHLETES EVENTS DATA
+
+dataOlympics <- read_csv("C:/Users/chint/Downloads/r-olympic-games-main/r-olympic-games-main/datasets/athleteEvents.csv", col_types = cols(
+                   ID = col_character(),
+                   Name = col_character(),
+                   Sex = col_factor(levels = c("M","F")),
+                   Age =  col_integer(),
+                   Height = col_double(),
+                   Weight = col_double(),
+                   Team = col_character(),
+                   NOC = col_character(),
+                   Games = col_character(),
+                   Year = col_integer(),
+                   Season = col_factor(levels = c("Summer","Winter")),
+                   City = col_character(),
+                   Sport = col_character(),
+                   Event = col_character(),
+                   Medal = col_factor(levels = c("Gold","Silver","Bronze","No Medal"))
+                 )
+)
+
+str(dataOlympics)
+```
+
+```{r}
+# Summary statistics
+summary(dataOlympics)
+```
+```{r}
+head(dataOlympics)
+```
+
+2.2: Load NOC Dataset 
+```{r}
+# LOAD DATA MATCHING NOCs (NATIONAL OLYMPIC COMMITTEE) WITH COUNTRIES
+
+NOCs <- read_csv("C:/Users/chint/Downloads/r-olympic-games-main/r-olympic-games-main/datasets/nocRegions.csv", col_types = cols(
+                  NOC = col_character(),
+                  region = col_character()
+                ))
+str(NOCs)
+
+```
+
+```{r}
+# Summary statistics
+summary(NOCs)
+```
+Step3: Data Cleaning/ Data Preprocessing
+```{r}
+# Check for Missing values
+summary(is.na(NOCs))
+```
+
+
+Check for Missing Values, Duplicates
+```{r}
+# Check for missing values
+summary(is.na(dataOlympics))
+
+```
+```{r}
+# Handle Missing Values - Replace missing values in the Age column with mean
+mean_age <- mean(dataOlympics$Age, na.rm = TRUE)
+dataOlympics$Age[is.na(dataOlympics$Age)] <- mean_age
+
+mean_height <- mean(dataOlympics$Height, na.rm = TRUE)
+dataOlympics$Height[is.na(dataOlympics$Height)] <- mean_height
+
+mean_weight <- mean(dataOlympics$Weight, na.rm = TRUE)
+dataOlympics$Weight[is.na(dataOlympics$Weight)] <- mean_weight
+
+dataOlympics$Medal[is.na(dataOlympics$Medal)] <- "No Medal"
+
+```
+
+```{r}
+#Summary after replacing the NA's
+summary(dataOlympics)
+```
+
+```{r}
+#First 6 entries after replacing the NA values
+head(dataOlympics)
+```
+
+Step4: Exploratory Data Analysis for Olympics Data 
+```{r}
+#Plot - Distribution of Ages
+library(ggplot2)
+
+qplot(x=Age, data=dataOlympics,
+      xlab="Age",
+      ylab="Number of People",
+      main = ("Distribution of Ages"),
+      geom="histogram",
+      binwidth=1,
+      fill=I("pink"),
+      col=I("blue"))+
+  scale_x_continuous(limits = c(10,71), breaks = seq(10,71,10))
+```
+
+This plot displays the distribution of ages based on the number of people. We select a histogram for its ability to provide a clear visual representation of age distribution through column bars. Notably, the highest number of athletes falls within the 20-30 age range, with 23-year-olds being the most prominent participants. Additionally, there is no representation of athletes over the age of 56, while the youngest participants are as young as 10 years old.
+
+```{r}
+# Plot - Distribution of Sport branches
+p <- ggplot(dataOlympics, aes(x = `Sport`))+
+       geom_bar(color="darkblue", fill="lightblue")+
+  ggtitle("Distribution of Sport Branchs") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+p
+```
+
+This plot illustrates the distribution of sport branches based on the count of each branch. We opt for a histogram to provide a clear visual representation of the distribution of sport branches, allowing us to easily interpret the data by observing the columns. Additionally, we utilize a theme to adjust the angle of the branches, enhancing clarity along the x-axis. Notably, 'Art Competitions', 'Gymnastics', and 'Swimming' exhibit higher participation rates compared to others. Surprisingly, basketball has a lower participation rate than expected, possibly due to the popularity of other sports in various countries. This discrepancy highlights the lesser-known status of sports like biathlon compared to more widely recognized sports like basketball.
+
+```{r}
+#Plot - Distribution of Heights
+qplot(x=Height, data=dataOlympics,
+      xlab="Height",
+      ylab="Number of People",
+      main = ("Distribution of Height"),
+      geom="histogram",
+      binwidth=1,
+      fill=I("black"),
+      col=I("green"))+
+  scale_x_continuous(limits = c(127,226), breaks = seq(127,226,10))
+```
+
+This plot visualizes the distribution of heights among Olympic athletes, displaying the frequency of heights with black bars against a green outline within the specified height range.
+
+```{r}
+#Plot for Distribution of Weights
+qplot(x=Weight, data=dataOlympics,
+      xlab="Weight",
+      ylab="Number of People",
+      main = ("Distribution of Weight"),
+      geom="histogram",
+      binwidth=1,
+      fill=I("grey"),
+      col=I("red"))+
+  scale_x_continuous(limits = c(25,214), breaks = seq(25,214,10))
+```
+
+We aim to visualize the distribution of weights. The most suitable method for this purpose is to create a histogram.
+
+```{r}
+#Plot - Distribution of Medal by Age
+qplot(x=Medal, y=Age, data=dataOlympics, main=('Distribution of Medal by Age'), geom='boxplot', color='purple')
+```
+
+This plot visualizes the distribution of medal types awarded to Olympic participants. To handle missing values, any NA entries are categorized as 'No Medal'. Notably, the highest mean of medal awards falls within the age range of 22-28, which is expected as younger participants typically excel in sports. Furthermore, outliers are observed beyond the age of 38. Employing a boxplot enables us to effectively analyze the median and outliers, facilitating a comprehensive understanding of medal distribution statistics across different age groups.
+
+```{r}
+# Plot - Distribution if Sports Types by Years
+ggplot(data = dataOlympics) +
+  aes(x = Year) +
+  aes(y = `Sport`) +
+  geom_point() +
+  geom_smooth(method = "lm", se = T) +
+  scale_x_continuous(limits= c(1896,2016))+
+  scale_color_manual(values = c("black", "yellow")) +
+  labs(col = "") +
+  labs(title = "Distribution of Sports Types by Years") +
+  theme_bw()
+```
+
+This plot aims to illustrate the distribution of sports branches and their participation rates across different years. Notably, significant gaps are observed during specific periods, such as 1936-1948 and 1912-1920, coinciding with the absence of Olympic Games due to World War II and World War I, respectively. Interestingly, lacrosse was played only once in 1904, adding a unique aspect to Olympic history. Moreover, tennis was notably absent for 46 years between 1924 and 1980. Overall, the plot highlights the cyclical nature of the Olympic Games, occurring every four years, and offers intriguing insights into historical events that impacted sports participation on the global stage.
+
+```{r}
+# Plot - Historical medal counts from Football Competitions
+library(dplyr)
+library(ggplot2)
+
+ftbl <- dataOlympics %>% 
+  filter(Sport == "Football") %>%
+  select(Name, Sex, Age, Team, NOC, Year, City, Event, Medal)
+
+# Count Events, Nations, and Football competitions each year
+counts_ftbl <- ftbl %>%
+  filter(Team != "Unknown") %>%
+  group_by(Year) %>%
+  summarize(
+    Events = n_distinct(Event),
+    Nations = n_distinct(Team),
+    Footballs = n_distinct(Name)
+  )
+
+# Count number of medals awarded to each Team
+medal_counts_ftbl <- ftbl %>%
+  filter(!is.na(Medal)) %>%
+  group_by(Team, Medal) %>%
+  summarize(Count = n()) 
+
+
+# Plot
+ggplot(medal_counts_ftbl, aes(x = Team, y = Count, fill = Medal)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_manual(values = c("Gold" = "#CD7F32", "Silver" = "#FFD700", "Bronze" = "#C0C0C0")) +
+  ggtitle("Historical medal counts from Football Competitions") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(breaks = seq(50, 200, by = 50))
+
+```
+
+This plot showcases the distribution of medals and their types among various teams. Notably, countries such as the USA, Germany, Brazil, the Soviet Union, and Yugoslavia emerge as prominent medal winners. This trend is often attributed to governmental support, particularly in countries with strong political backing for Olympic sports, especially football. By opting for a histogram, our aim is to provide a clear depiction of the distribution of medals and discern which countries have won which types of medals. Additionally, flipping the histogram coordinates aids in better visualizing the medal distribution across countries, facilitating an insightful analysis of medal distribution patterns.
+
+```{r}
+#Plot - Number of Countries Participated in the Olympics
+dataOlympics %>%
+  group_by(Year, Season) %>%
+  summarise(NoOfCountries = length(unique(NOC))) %>%
+  ggplot(aes(x = Year, y = NoOfCountries, group = Season)) +
+  geom_line(aes(color = Season)) +
+  geom_point(aes(color = Season)) +
+  labs(x = "Year", y = "#of countries that participated", title = "#of countries that participated in the Olympics") +
+  theme_minimal()
+```
+
+This plot illustrates the growth in Olympic participation over time, showcasing a notable disparity between the number of participants in the Summer and Winter Games. Through a scatter plot overlaid with lines, we aim to highlight the trend of increasing participation and discern patterns in country counts over the years. This approach enables a clear visualization of participation rates across different weather conditions, facilitating an analysis of how participation varies among countries over time.
+
+
+```{r}
+summary(dataOlympics)
+```
+
+
+
+```{r}
+# Check column names in the DataOlympics dataset
+colnames(dataOlympics)
+
+```
+Correlation between the features
+
+```{r}
+# Load required libraries
+library(dplyr)
+
+# Select the relevant features
+features <- c("Year", "Team", "Season", "Age", "Height", "Weight", "Sport", "Event")
+
+# Subset the data with selected features
+selected_data <- dataOlympics[, features]
+
+# Convert categorical variables to dummy variables (one-hot encoding)
+encoded_data <- selected_data %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  mutate(across(where(is.factor), as.numeric))
+
+# Compute the correlation matrix
+correlation_matrix <- cor(encoded_data)
+
+# Print correlation matrix
+print(correlation_matrix)
+
+```
+From the correlation matrix
+1) Height and Weight: These two features have a very high positive correlation of approximately 0.79, which indicates that they are strongly positively correlated. This is not surprising, as taller individuals tend to weigh more.
+2) Sport and Event: These features have a very high positive correlation of approximately 0.99, which indicates that they are almost perfectly correlated. This suggests that the specific event (e.g., "100m sprint") is highly associated with the sport (e.g., "Athletics").
+So we can remove one feature from each.
+
+Step5: Model Selection
+```{r}
+# Create Outcome variable based on Medal
+dataOlympics$Outcome <- ifelse(dataOlympics$Medal == "No Medal", 0, 1)
+target<-"Outcome"
+summary(dataOlympics)
+
+```
+```{r}
+# Load required libraries
+library(gbm)
+library(caret)
+
+# Define features and target
+features <- c("Year", "Season", "Age", "Height", "Event")
+target <- "Outcome"
+
+# Prepare the data
+data <- dataOlympics[, c(features, target)]
+
+# Convert categorical variables to factors
+data$Season <- as.factor(data$Season)
+data$Event <- as.factor(data$Event)
+
+# Split the data into training and testing sets
+set.seed(123)  # For reproducibility
+train_index <- createDataPartition(data[[target]], p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+dim(train_data)
+dim(test_data)
+```
+
+
+5.1: Gradient Boosting Model Fitting
+```{r}
+
+# Load required libraries
+library(gbm)
+library(caret)
+
+# Define features and target
+features <- c("Year", "Season", "Age", "Height", "Event")
+target <- "Outcome"
+
+# Prepare the data
+data <- dataOlympics[, c(features, target)]
+
+# Convert categorical variables to factors
+data$Season <- as.factor(data$Season)
+data$Event <- as.factor(data$Event)
+
+# Split the data into training and testing sets
+set.seed(123)  # For reproducibility
+train_index <- createDataPartition(data[[target]], p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+# Train the GBM model
+gbm_model <- gbm(Outcome ~ ., data = train_data, distribution = "bernoulli", n.trees = 100, interaction.depth = 3)
+# Make predictions on the training data
+train_predictions <- predict(gbm_model, newdata = train_data, type = "response")
+
+# Evaluate the model on the training data
+train_accuracy <- mean((train_predictions > 0.5) == train_data$Outcome)
+print(paste("Training Accuracy:", train_accuracy))
+
+
+
+```
+Model Evaluation
+```{r}
+# Make predictions on the test data
+predictions <- predict(gbm_model, newdata = test_data, type = "response")
+
+# Evaluate the model
+accuracy <- mean((predictions > 0.5) == test_data$Outcome)
+print(paste("Accuracy:", accuracy))
+
+# Convert the target variable in test data to a factor with levels
+test_data$Outcome <- factor(test_data$Outcome, levels = c(0, 1))
+
+
+
+# Make predictions on the test data
+predictions <- predict(gbm_model, newdata = test_data, type = "response")
+
+# Convert predictions to binary class labels
+predicted_classes <- ifelse(predictions > 0.5, 1, 0)
+# Set levels of predicted_classes to match the levels of test_data[[target]]
+levels(predicted_classes) <- levels(test_data[[target]])
+# Check levels of predicted_classes and test_data[[target]]
+levels(predicted_classes)
+levels(test_data[[target]])
+```
+```{r}
+anyNA(test_data[[target]])
+
+```
+```{r}
+test_data <- test_data[complete.cases(test_data[[target]]), ]
+
+```
+
+
+```{r}
+# Convert the target variable in test data to a factor with levels
+test_data$Outcome <- factor(test_data$Outcome, levels = c(0, 1))
+
+
+
+# Make predictions on the test data
+predictions <- predict(gbm_model, newdata = test_data, type = "response")
+
+
+# Convert predicted_classes to factor with levels matching test_data[[target]]
+predicted_classes <- factor(predicted_classes, levels = levels(test_data[[target]]))
+
+# Set levels of predicted_classes to match the levels of test_data[[target]]
+levels(predicted_classes) <- levels(test_data[[target]])
+
+
+
+
+# Compute evaluation metrics
+conf_matrix <- confusionMatrix(predicted_classes, test_data[[target]])
+precision <- conf_matrix$byClass["Pos Pred Value"]
+recall <- conf_matrix$byClass["Sensitivity"]
+specificity <- conf_matrix$byClass["Specificity"]
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+# Load the pROC library
+library(pROC)
+
+# Calculate ROC curve and AUC
+roc_obj <- roc(test_data[[target]], predictions)
+
+# Plot ROC curve
+plot(roc_obj, main = "ROC Curve", col = "blue")
+
+library(PRROC)
+# Check data types of predictions and target variable
+class(predictions)
+class(test_data[[target]])
+
+# Convert factors to numeric if needed
+if (class(predictions) == "factor") {
+  predictions <- as.numeric(as.character(predictions))
+}
+if (class(test_data[[target]]) == "factor") {
+  test_data[[target]] <- as.numeric(as.character(test_data[[target]]))
+}
+
+# Check for missing values and remove them if present
+anyNA(predictions)
+anyNA(test_data[[target]])
+
+# If missing values are present, remove them
+if (anyNA(predictions)) {
+  predictions <- predictions[!is.na(predictions)]
+}
+if (anyNA(test_data[[target]])) {
+  test_data[[target]] <- test_data[[target]][!is.na(test_data[[target]])]
+}
+
+# Now, you can run the pr.curve function
+pr_obj <- pr.curve(scores.class0 = predictions, weights.class0 = test_data[[target]], curve = TRUE)
+
+
+# Calculate Precision-Recall curve and metrics
+pr_obj <- pr.curve(scores.class0 = predictions, weights.class0 = test_data[[target]], curve = TRUE)
+
+# Plot Precision-Recall curve
+plot(pr_obj, main = "Precision-Recall Curve", col = "blue")
+
+# Install and load the pROC package if not already installed
+
+library(pROC)
+
+# Calculate and print AUC
+auc_val <- auc(roc_obj)
+print(paste("AUC:", auc_val))
+
+
+# Print evaluation metrics
+print(paste("Precision:", precision))
+print(paste("Recall:", recall))
+print(paste("Specificity:", specificity))
+print(paste("F1 Score:", f1_score))
+
+
+```
+
+This indicates that the model is performing reasonably well in terms of correctly predicting positive cases (teams winning a medal) compared to the total positive predictions.
+
+
+```{r}
+library(dplyr)
+
+# Assuming dataOlympics is your dataset
+
+# Create separate columns for gold, silver, and bronze medals
+dataOlympics <- dataOlympics %>%
+  mutate(
+    Gold = ifelse(Medal == "Gold", 1, 0),
+    Silver = ifelse(Medal == "Silver", 1, 0),
+    Bronze = ifelse(Medal == "Bronze", 1, 0)
+  )
+
+# Print the updated dataset
+print(dataOlympics)
+
+```
+
+5.2: ARIMA Model Fitting 
+
+```{r}
+# Load required libraries
+library(forecast)
+library(caret)
+
+# Define features and target
+features <- c("Year", "Season", "Age", "Height", "Event")
+target <- "Outcome"
+
+# Prepare the data
+data <- dataOlympics[, c(features, target)]
+
+# Convert categorical variables to factors
+data$Season <- as.factor(data$Season)
+data$Event <- as.factor(data$Event)
+
+# Split the data into training and testing sets
+set.seed(123)  # For reproducibility
+train_index <- createDataPartition(data[[target]], p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+# Convert the data into a time series
+train_ts <- ts(train_data$Outcome, start = 1, end = length(train_data$Outcome), frequency = 1)
+
+# Train the ARIMA model
+arima_model <- auto.arima(train_ts)
+
+# Make predictions on the test data
+predictions_arima <- forecast(arima_model, h = length(test_data$Outcome))
+
+# Extract the predicted values
+predicted_values <- as.numeric(predictions_arima$mean)
+
+# Evaluate the model
+accuracy_arima <- mean((predicted_values > 0.5) == test_data$Outcome)
+print(paste("Accuracy (ARIMA):", accuracy_arima))
+
+```
+
+```{r}
+# Convert the test data outcome to factors
+test_data$Outcome <- factor(test_data$Outcome, levels = c(0, 1))
+
+# Calculate confusion matrix
+conf_matrix <- confusionMatrix(factor(ifelse(predicted_values > 0.5, 1, 0)), test_data$Outcome)
+
+# Calculate precision
+precision <- conf_matrix$byClass["Pos Pred Value"]
+print(paste("Precision:", precision))
+
+# Calculate recall (Sensitivity)
+recall <- conf_matrix$byClass["Sensitivity"]
+print(paste("Recall (Sensitivity):", recall))
+
+# Calculate specificity
+specificity <- conf_matrix$byClass["Specificity"]
+print(paste("Specificity:", specificity))
+
+# Calculate F1-score
+f1_score <- 2 * (precision * recall) / (precision + recall)
+print(paste("F1 Score:", f1_score))
+
+```
+The precision, recall (sensitivity), specificity, and F1-score values provide insights into the performance of the model:
+
+Precision: Precision measures the accuracy of positive predictions. In this case, the precision value of approximately 0.85 indicates that when the model predicts a positive outcome (1), it is correct around 85% of the time.
+Recall (Sensitivity): Recall, also known as sensitivity, measures the model's ability to correctly identify positive samples out of all actual positives. A recall value of 1 indicates that the model identifies all positive samples correctly.
+Specificity: Specificity measures the model's ability to correctly identify negative samples out of all actual negatives. A specificity value of 0 suggests that the model did not correctly identify any of the negative samples.
+F1 Score: The F1-score is the harmonic mean of precision and recall, providing a balance between the two metrics. A high F1-score indicates that the model has both good precision and recall.
+
+Based on these metrics:
+
+The model has high precision, indicating that it correctly identifies positive outcomes most of the time.
+The recall (sensitivity) value of 1 suggests that the model effectively identifies all positive outcomes.
+However, the specificity value of 0 indicates that the model does not correctly identify negative outcomes.
+The F1-score, being high, suggests that the model has a good balance between precision and recall.
+Overall, while the model performs well in identifying positive outcomes, it struggles with correctly identifying negative outcomes. Depending on the specific context and requirements of the application, further analysis and improvements may be needed to address this imbalance in performance.
+

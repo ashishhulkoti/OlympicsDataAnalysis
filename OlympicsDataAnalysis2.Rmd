@@ -1,0 +1,283 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+library("gganimate")
+library("data.table")
+library("knitr")
+library("gridExtra")
+library("tidyverse")
+library("plotly")
+library("readr")
+library("caret")
+library("gbm")
+```
+
+
+```{r}
+# LOAD ATHLETES EVENTS DATA
+
+dataOlympics <- read_csv("athleteEvents.csv", col_types = cols(
+                   ID = col_character(),
+                   Name = col_character(),
+                   Sex = col_factor(levels = c("M","F")),
+                   Age =  col_integer(),
+                   Height = col_double(),
+                   Weight = col_double(),
+                   Team = col_character(),
+                   NOC = col_character(),
+                   Games = col_character(),
+                   Year = col_integer(),
+                   Season = col_factor(levels = c("Summer","Winter")),
+                   City = col_character(),
+                   Sport = col_character(),
+                   Event = col_character(),
+                   Medal = col_factor(levels = c("Gold","Silver","Bronze","No Medal"))
+                 )
+)
+
+str(dataOlympics)
+```
+
+```{r}
+# Summary statistics
+summary(dataOlympics)
+```
+```{r}
+head(dataOlympics)
+```
+
+
+```{r}
+# LOAD DATA MATCHING NOCs (NATIONAL OLYMPIC COMMITTEE) WITH COUNTRIES
+
+NOCs <- read_csv("nocRegions.csv", col_types = cols(
+                  NOC = col_character(),
+                  region = col_character()
+                ))
+str(NOCs)
+
+```
+
+```{r}
+# Summary statistics
+summary(NOCs)
+```
+
+```{r}
+summary(is.na(NOCs))
+```
+
+
+
+```{r}
+# Check for missing values
+summary(is.na(dataOlympics))
+
+```
+```{r}
+# Replace missing values in the Age column with mean
+mean_age <- mean(dataOlympics$Age, na.rm = TRUE)
+dataOlympics$Age[is.na(dataOlympics$Age)] <- mean_age
+
+mean_height <- mean(dataOlympics$Height, na.rm = TRUE)
+dataOlympics$Height[is.na(dataOlympics$Height)] <- mean_height
+
+mean_weight <- mean(dataOlympics$Weight, na.rm = TRUE)
+dataOlympics$Weight[is.na(dataOlympics$Weight)] <- mean_weight
+
+dataOlympics$Medal[is.na(dataOlympics$Medal)] <- "No Medal"
+
+```
+
+```{r}
+summary(dataOlympics)
+```
+```{r}
+dataOlympics$Medal[is.na(dataOlympics$Medal)] <- "No Medal"
+```
+
+```{r}
+head(dataOlympics)
+```
+
+```{r}
+# Remove the "Games" column
+dataOlympics <- dataOlympics[, !names(dataOlympics) %in% c("Games")]
+
+# Display the modified dataset
+head(dataOlympics)
+```
+```{r}
+summary(dataOlympics)
+```
+
+
+
+```{r}
+# Check column names in the DataOlympics dataset
+colnames(dataOlympics)
+
+```
+
+
+```{r}
+# Load required libraries
+library(dplyr)
+
+# Select the relevant features
+features <- c("Year", "Team", "Season", "Age", "Height", "Weight", "Sport", "Event")
+
+# Subset the data with selected features
+selected_data <- dataOlympics[, features]
+
+# Convert categorical variables to dummy variables (one-hot encoding)
+encoded_data <- selected_data %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  mutate(across(where(is.factor), as.numeric))
+
+# Compute the correlation matrix
+correlation_matrix <- cor(encoded_data)
+
+# Print correlation matrix
+print(correlation_matrix)
+
+```
+From the confusion matrix 
+1) Height and Weight: These two features have a very high positive correlation of approximately 0.79, which indicates that they are strongly positively correlated. This is not surprising, as taller individuals tend to weigh more.
+2) Sport and Event: These features have a very high positive correlation of approximately 0.99, which indicates that they are almost perfectly correlated. This suggests that the specific event (e.g., "100m sprint") is highly associated with the sport (e.g., "Athletics").
+So we can remove one feature from each.
+
+```{r}
+
+# Create Outcome variable based on Medal
+dataOlympics$Outcome <- ifelse(dataOlympics$Medal == "No Medal", 0, 1)
+target<-"Outcome"
+
+```
+
+
+```{r}
+# Define features and target
+features <- c("Year", "Season", "Age", "Height", "Event")
+target <- "Outcome"
+
+# Prepare the data
+data <- dataOlympics[, c(features, target)]
+
+# Convert categorical variables to factors
+data$Season <- as.factor(data$Season)
+data$Event <- as.factor(data$Event)
+
+# Split the data into training and testing sets
+set.seed(123)  # For reproducibility
+train_index <- createDataPartition(data[[target]], p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+# Train the GBM model
+gbm_model <- gbm(Outcome ~ ., data = train_data, distribution = "bernoulli", n.trees = 100, interaction.depth = 3)
+
+# Make predictions on the test data
+predictions <- predict(gbm_model, newdata = test_data, type = "response")
+
+# Evaluate the model
+accuracy <- mean((predictions > 0.5) == test_data$Outcome)
+print(paste("Accuracy:", accuracy))
+
+```
+
+```{r}
+# Define features and target
+features <- c("Year", "Season", "Age", "Height", "Event")
+target <- "Outcome"
+
+# Prepare the data
+data <- dataOlympics[, c(features, target)]
+
+# Convert categorical variables to factors
+data$Season <- as.factor(data$Season)
+data$Event <- as.factor(data$Event)
+
+# Split the data into training and testing sets
+set.seed(123)  # For reproducibility
+train_index <- createDataPartition(data[[target]], p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+# Train the logistic regression model
+logistic_model <- glm(Outcome ~ ., data = train_data, family = "binomial")
+
+# Make predictions on the test data
+predictions <- predict(logistic_model, newdata = test_data, type = "response")
+
+# Convert probabilities to binary outcomes (0 or 1)
+predicted_classes <- ifelse(predictions > 0.5, 1, 0)
+
+# Evaluate the model
+accuracy <- mean(predicted_classes == test_data$Outcome)
+print(paste("Accuracy:", accuracy))
+```
+
+
+```{r}
+# Load required libraries
+library(forecast)
+library(caret)
+
+# Define features and target
+features <- c("Year", "Season", "Age", "Height", "Event")
+target <- "Outcome"
+
+# Prepare the data
+data <- dataOlympics[, c(features, target)]
+
+# Convert categorical variables to factors
+data$Season <- as.factor(data$Season)
+data$Event <- as.factor(data$Event)
+
+# Split the data into training and testing sets
+set.seed(123)  # For reproducibility
+train_index <- createDataPartition(data[[target]], p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+# Convert the data into a time series
+train_ts <- ts(train_data$Outcome, start = 1, end = length(train_data$Outcome), frequency = 1)
+
+# Train the ARIMA model
+arima_model <- auto.arima(train_ts)
+
+# Make predictions on the test data
+predictions_arima <- forecast(arima_model, h = length(test_data$Outcome))
+
+# Extract the predicted values
+predicted_values <- as.numeric(predictions_arima$mean)
+
+# Evaluate the model
+accuracy_arima <- mean((predicted_values > 0.5) == test_data$Outcome)
+print(paste("Accuracy (ARIMA):", accuracy_arima))
+# Convert the test data outcome to factors
+test_data$Outcome <- factor(test_data$Outcome, levels = c(0, 1))
+
+# Calculate confusion matrix
+conf_matrix <- confusionMatrix(factor(ifelse(predicted_values > 0.5, 1, 0)), test_data$Outcome)
+
+# Calculate precision
+precision <- conf_matrix$byClass["Pos Pred Value"]
+print(paste("Precision:", precision))
+
+# Calculate recall (Sensitivity)
+recall <- conf_matrix$byClass["Sensitivity"]
+print(paste("Recall (Sensitivity):", recall))
+
+# Calculate specificity
+specificity <- conf_matrix$byClass["Specificity"]
+print(paste("Specificity:", specificity))
+
+# Calculate F1-score
+f1_score <- 2 * (precision * recall) / (precision + recall)
+print(paste("F1 Score:", f1_score))
+```
