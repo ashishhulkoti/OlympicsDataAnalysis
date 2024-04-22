@@ -2,8 +2,8 @@
 Analysing and Visualising  Olympics Dataset
 
 Team Details:\
-Name&emsp;Hawk ID&emsp;Email ID\
-Ramani Chinthakindi	    A20531649	    rchinthakindi@hawk.iit.edu\
-Anjali Jagdish Tavhare 	A20550996     atavhare@hawk.iit.edu\
-Ashish Hulkoti 	        A20548738     ahulkoti@hawk.iit.edu\
-Pavani Rangineni 	      A20516359	    prangineni@hawk.iit.edu\
+Name&emsp;&emsp;&emsp;&emsp;Hawk ID&emsp;&emsp;&emsp;&emsp;&emsp;Email ID\
+Ramani Chinthakindi&emsp;&emsp;A20531649&emsp;&emsp;rchinthakindi@hawk.iit.edu\
+Anjali Jagdish Tavhare&emsp;A20550996&emsp;&emsp;atavhare@hawk.iit.edu\
+Ashish Hulkoti&emsp;&emsp;&emsp; A20548738&emsp;&emsp;ahulkoti@hawk.iit.edu\
+Pavani Rangineni&emsp;&emsp;A20516359&emsp;&emsp;prangineni@hawk.iit.edu\
